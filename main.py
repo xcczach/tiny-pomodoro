@@ -16,7 +16,7 @@ import tkinter as tk
 from tkinter import ttk
 
 import pystray
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageTk
 try:
     from plyer import notification           # 备用通知
 except ImportError:
@@ -33,14 +33,22 @@ if platform.system() == "Windows":
 
 
 # ---------- 常量 ----------
-DATA_FILE  = "./work_rest_stats.json"
+# 脚本/可执行文件所在目录（兼容 PyInstaller / nuitka）
+if getattr(sys, "frozen", False):            # 打包后的独立 exe
+    HERE = Path(sys._MEIPASS)                # 临时展开目录
+else:
+    HERE = Path(__file__).resolve().parent   # 源码运行
+
+ICON_PATH  = HERE / "assets" / "icon.png"    # ← 自定义图标
+DATA_FILE  = HERE / "work_rest_stats.json"   # 保存统计
 DEF_WORK_S = 50 * 60
 DEF_REST_S = 10 * 60
+
 DARK_BG, DARK_FG = "#222831", "#eeeeee"
 ACCENT           = "#00adb5"
 MARGIN           = 32
-SHIFT_X, SHIFT_Y = 160, 120        # 向屏幕内偏移
-AUTO_SAVE_MS     = 5 * 60 * 1000   # 5 分钟 (ms) 
+SHIFT_X, SHIFT_Y = 0, 60                  # 向屏幕内偏移
+AUTO_SAVE_MS     = 5 * 60 * 1000             # 5 分钟 (ms)
 
 
 # ---------- 工具 ----------
@@ -52,7 +60,7 @@ def fmt_sec(sec: int) -> str:
 # ---------- 数据 ----------
 def load_stats():
     """读取 / 初始化统计文件"""
-    if Path(DATA_FILE).exists():
+    if DATA_FILE.exists():
         try:
             with open(DATA_FILE, encoding="utf-8") as f:
                 data = json.load(f)
@@ -89,7 +97,6 @@ def add_seconds(stats, key, seconds: int):
 
 
 # ---------- 通用深色 ttk Style ----------
-
 def apply_dark_style(widget):
     style = ttk.Style(widget)
     style.theme_use("clam")
@@ -103,15 +110,30 @@ def apply_dark_style(widget):
 class StartWindow(tk.Toplevel):
     def __init__(self, app):
         super().__init__(app.root)
+
+        # === 去掉左上角图标 ===
+        if platform.system() == "Windows":
+            # Win32 “tool window” 样式：无图标、标题栏更窄，也不会在任务栏占位
+            self.wm_attributes("-toolwindow", True)
+            # 去掉右上角的关闭按钮
+            self.overrideredirect(True)
+        else:
+            # 其它平台直接去掉全部窗口装饰
+            self.overrideredirect(True)
+
+        # self.iconphoto(True, app.tk_icon)   # ← 这一行删除或注释掉
+
         self.app = app
         self.title("")
         self.configure(bg=DARK_BG)
         self.resizable(False, False)
-        self.attributes("-topmost", True)  # 置顶
+        self.attributes("-topmost", True)      # 置顶
         apply_dark_style(self)
 
-        ttk.Button(self, text="开始工作", width=18, command=self._begin)\
-            .grid(row=0, column=0, padx=25, pady=25)
+        ttk.Button(self,
+                   text="开始工作",
+                   width=18,
+                   command=self._begin).grid(row=0, column=0, padx=25, pady=25)
 
         self.after(10, self._place_pos)
         self.protocol("WM_DELETE_WINDOW", self.withdraw)
@@ -133,8 +155,13 @@ class StartWindow(tk.Toplevel):
 class RestWindow(tk.Toplevel):
     def __init__(self, app):
         super().__init__(app.root)
+        self.transient(app.root)
+        if platform.system() == "Windows":
+            # “tool window” 样式：更窄的标题栏，也避免任务栏占位
+            self.wm_attributes("-toolwindow", True)
+        self.iconphoto(True, app.tk_icon)
         self.app = app
-        self.title("Take a Break")
+        self.title("")
         self.configure(bg=DARK_BG)
         self.resizable(False, False)
         self.attributes("-topmost", True)  # 置顶
@@ -176,13 +203,21 @@ class WorkRestApp:
         self.root = tk.Tk()
         self.root.withdraw()
 
+        # --- 窗口 / 任务栏图标 ------------------------
+        self.tk_icon = self._load_tk_icon()
+        # 如需兼容 Windows16×16，可再生成一张小图：
+        # small = self.tk_icon.subsample(4, 4)
+        # self.root.iconphoto(True, small, self.tk_icon)
+        self.root.iconphoto(True, self.tk_icon)
+        # -------------------------------------------
+
         self.stats = load_stats()
         self.work_sec = self.stats["config"]["work_sec"]
         self.rest_sec = self.stats["config"]["rest_sec"]
 
         self.state = "idle"
         self.elapsed_seconds = 0
-        self.session_flushed = 0      # 本轮已写入 stats 的秒数  <-- 新增
+        self.session_flushed = 0      # 本轮已写入 stats 的秒数
 
         self.running = threading.Event()
         self.paused  = threading.Event()
@@ -197,6 +232,16 @@ class WorkRestApp:
         self._auto_save()
 
         StartWindow(self)
+
+    def _load_tk_icon(self):
+        """返回 tk.PhotoImage，用于窗口左上角和任务栏"""
+        try:
+            # 优先直接加载文件，速度更快
+            return tk.PhotoImage(file=str(ICON_PATH))
+        except Exception:
+            # 如果文件缺失或损坏，则用备用托盘图生成
+            pil_img = self._create_icon()                  # PIL.Image
+            return ImageTk.PhotoImage(pil_img)             # 转成 PhotoImage
 
     # === 自动保存 ===
     def _auto_save(self):
@@ -239,7 +284,7 @@ class WorkRestApp:
     def _timer_loop(self):
         while self.running.is_set():
             # ------ 工作 ------
-            self.session_flushed = 0          # 新轮开始 ←
+            self.session_flushed = 0
             self.state = "working"
             self.elapsed_seconds = 0
             self._notify("开始工作", f"专注 {fmt_sec(self.work_sec)}")
@@ -250,11 +295,10 @@ class WorkRestApp:
                     time.sleep(0.5)
                 time.sleep(1)
                 self.elapsed_seconds += 1
-            # 段尾再冲一次，确保全部到账
-            self._flush_elapsed()
+            self._flush_elapsed()           # 段尾再冲一次
 
             # ------ 休息 ------
-            self.session_flushed = 0          # 新轮开始 ←
+            self.session_flushed = 0
             self.state = "resting"
             self.elapsed_seconds = 0
             self.root.after(0, self._show_rest_window)
@@ -268,11 +312,22 @@ class WorkRestApp:
     # === 托盘图标 ===
     @staticmethod
     def _create_icon():
+        """优先使用 asset/icon.png；若失败则绘制备用图标"""
+        try:
+            img = Image.open(ICON_PATH).convert("RGBA")
+            if img.size != (64, 64):        # pystray 建议 64×64
+                img = img.resize((64, 64), Image.LANCZOS)
+            return img
+        except Exception as e:
+            print(f"[托盘] 加载 {ICON_PATH} 失败，使用默认图标 →", e)
+
+        # --- 备用：用 Pillow 绘制 ---
         size = 64
-        img  = Image.new("RGB", (size, size), (0, 0, 0, 0))
+        img  = Image.new("RGBA", (size, size), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
         draw.ellipse((8, 8, 56, 56), fill=(0, 173, 181))
-        draw.polygon([(32, 16), (48, 32), (32, 48), (16, 32)], fill=(34, 40, 49))
+        draw.polygon([(32, 16), (48, 32), (32, 48), (16, 32)],
+                     fill=(34, 40, 49))
         return img
 
     def _run_tray(self):
@@ -288,12 +343,12 @@ class WorkRestApp:
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("退出", self._quit)
         )
-        self.icon = pystray.Icon("WorkRest", self._create_icon(), "Work & Rest", menu)
+        self.icon = pystray.Icon("WorkRest", self._create_icon(), "Tiny Pomodoro", menu)
         self.icon.run()
 
     # === 控制 ===
     def start(self):
-        if self.state not in ("idle",):
+        if self.state != "idle":
             return
         self.running.set()
         self.paused.clear()
@@ -313,7 +368,7 @@ class WorkRestApp:
             self._notify("已暂停", "计时器已暂停")
 
     def end_rest(self):
-        self._flush_elapsed()               # 用冲账替代整段累加 ←
+        self._flush_elapsed()               # 用冲账替代整段累加
         self.state = "working"
 
     def stop(self):
@@ -329,7 +384,7 @@ class WorkRestApp:
 
     # === 设置窗口 ===
     def open_settings(self):
-        self._flush_elapsed()               # 确保数据显示最新 ←
+        self._flush_elapsed()               # 确保数据显示最新
         if not self.settings_win or not self.settings_win.winfo_exists():
             self.settings_win = SettingsWindow(self)
         self.settings_win.deiconify()
@@ -352,7 +407,7 @@ class WorkRestApp:
             self._notify("当前状态", "未开始计时")
 
     def _menu_stats(self, *_):
-        self._flush_elapsed()               # ←
+        self._flush_elapsed()
         s, today = self.stats, str(date.today())
         d = s["days"].get(today, {"work": 0, "rest": 0})
         self._notify("统计",
@@ -397,8 +452,14 @@ class WorkRestApp:
 class SettingsWindow(tk.Toplevel):
     def __init__(self, app):
         super().__init__(app.root)
+        self.transient(app.root)
+
+        if platform.system() == "Windows":
+            # “tool window” 样式：更窄的标题栏，也避免任务栏占位
+            self.wm_attributes("-toolwindow", True)
+        self.iconphoto(True, app.tk_icon)
         self.app = app
-        self.title("Work & Rest Settings")
+        self.title("设置")
         self.configure(bg=DARK_BG)
         self.resizable(False, False)
         self.attributes("-topmost", True)  # 置顶
