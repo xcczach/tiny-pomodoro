@@ -201,6 +201,12 @@ class RestWindow(tk.Toplevel):
         self.destroy()
         self.app.end_rest()
 
+    def refresh_info(self):
+        """立刻把标签更新为最新休息上限"""
+        elapsed = int(self.app.elapsed_seconds)
+        target  = self.app.rest_sec
+        self.var_info.set(f"休息 {fmt_sec(elapsed)} / {fmt_sec(target)}")
+
 
 # ---------- 主应用 ----------
 class WorkRestApp:
@@ -286,21 +292,27 @@ class WorkRestApp:
             print(f"[通知] {title}: {msg}")
 
     # === 主计时线程 ===
+    # ---------- 主计时线程 ----------
     def _timer_loop(self):
         while self.running.is_set():
+
             # ------ 工作 ------
             self.session_flushed = 0
             self.state = "working"
             self.elapsed_seconds = 0
             self._notify("开始工作", f"专注 {fmt_sec(self.work_sec)}")
-            for _ in range(self.work_sec):
-                if not self.running.is_set():
-                    return
-                while self.paused.is_set():
+
+            # ✨ 用 while 替换 for，随时感知 work_sec 的变化
+            while (
+                self.running.is_set()
+                and self.state == "working"         # 处理中或被继续
+                and self.elapsed_seconds < self.work_sec
+            ):
+                while self.paused.is_set():         # 暂停
                     time.sleep(0.5)
                 time.sleep(1)
                 self.elapsed_seconds += 1
-            self._flush_elapsed()           # 段尾再冲一次
+            self._flush_elapsed()                   # 段尾冲账
 
             # ------ 休息 ------
             self.session_flushed = 0
@@ -308,12 +320,17 @@ class WorkRestApp:
             self.elapsed_seconds = 0
             self._notify("开始休息", f"放松 {fmt_sec(self.rest_sec)}")
             self.root.after(0, self._show_rest_window)
-            while self.running.is_set() and self.state in ("resting", "paused_rest"):
+
+            while (
+                self.running.is_set()
+                and self.state in ("resting", "paused_rest")
+                and self.elapsed_seconds < self.rest_sec
+            ):
                 while self.paused.is_set():
                     time.sleep(0.5)
                 time.sleep(1)
                 self.elapsed_seconds += 1
-            # 休息段的计入由 end_rest() 负责
+            # 休息段的计入仍由 end_rest() 负责
 
     # === 托盘图标 ===
     @staticmethod
@@ -491,6 +508,15 @@ class SettingsWindow(tk.Toplevel):
         self.app.stats["config"]["work_sec"] = self.app.work_sec
         self.app.stats["config"]["rest_sec"] = self.app.rest_sec
         save_stats(self.app.stats)
+        # ✨ 如果正在休息，就立即刷新窗口显示
+        if self.app.rest_win and self.app.rest_win.winfo_exists():
+            self.app.rest_win.refresh_info()
+        if (
+            self.app.state in ("working", "paused_work")
+            and self.app.elapsed_seconds >= self.app.work_sec
+        ):
+            # 让工作段立即结束
+            self.app.paused.clear()
         self.withdraw()
 
 
