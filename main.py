@@ -33,11 +33,12 @@ if platform.system() == "Windows":
 
 
 # ---------- 常量 ----------
-# 脚本/可执行文件所在目录（兼容 PyInstaller / nuitka）
-HERE = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
-
-ICON_PATH  = HERE / "assets" / "icon.png"    # ← 自定义图标
-DATA_FILE  = HERE / "work_rest_stats.json"   # 保存统计
+ICON_PATH  = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent)) / "assets" / "icon.png"    # ← 自定义图标
+if getattr(sys, 'frozen', False):            # 打包态
+    DATA_DIR = Path(sys.executable).resolve().parent
+else:                                        # 源码态
+    DATA_DIR = Path(__file__).resolve().parent
+DATA_FILE  = DATA_DIR / "tiny_pomodoro_stats.json"   # 保存统计
 DEF_WORK_S = 50 * 60
 DEF_REST_S = 10 * 60
 
