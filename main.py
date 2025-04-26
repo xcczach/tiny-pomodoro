@@ -34,10 +34,7 @@ if platform.system() == "Windows":
 
 # ---------- 常量 ----------
 # 脚本/可执行文件所在目录（兼容 PyInstaller / nuitka）
-if getattr(sys, "frozen", False):            # 打包后的独立 exe
-    HERE = Path(sys._MEIPASS)                # 临时展开目录
-else:
-    HERE = Path(__file__).resolve().parent   # 源码运行
+HERE = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
 
 ICON_PATH  = HERE / "assets" / "icon.png"    # ← 自定义图标
 DATA_FILE  = HERE / "work_rest_stats.json"   # 保存统计
