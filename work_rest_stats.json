@@ -1,10 +1,10 @@
 {
-  "total_work": 1242,
-  "total_rest": 1635,
+  "total_work": 1302,
+  "total_rest": 2166,
   "days": {
     "2025-04-26": {
-      "work": 1242,
-      "rest": 1635
+      "work": 1302,
+      "rest": 2166
     }
   },
   "config": {

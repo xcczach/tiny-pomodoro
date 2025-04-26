@@ -155,16 +155,23 @@ class StartWindow(tk.Toplevel):
 class RestWindow(tk.Toplevel):
     def __init__(self, app):
         super().__init__(app.root)
-        self.transient(app.root)
+        # === 去掉左上角图标 ===
         if platform.system() == "Windows":
-            # “tool window” 样式：更窄的标题栏，也避免任务栏占位
+            # Win32 “tool window” 样式：无图标、标题栏更窄，也不会在任务栏占位
             self.wm_attributes("-toolwindow", True)
-        self.iconphoto(True, app.tk_icon)
+            # 去掉右上角的关闭按钮
+            self.overrideredirect(True)
+        else:
+            # 其它平台直接去掉全部窗口装饰
+            self.overrideredirect(True)
+
+        # self.iconphoto(True, app.tk_icon)   # ← 这一行删除或注释掉
+
         self.app = app
         self.title("")
         self.configure(bg=DARK_BG)
         self.resizable(False, False)
-        self.attributes("-topmost", True)  # 置顶
+        self.attributes("-topmost", True)      # 置顶
         apply_dark_style(self)
 
         self.var_info = tk.StringVar()
@@ -301,6 +308,7 @@ class WorkRestApp:
             self.session_flushed = 0
             self.state = "resting"
             self.elapsed_seconds = 0
+            self._notify("开始休息", f"放松 {fmt_sec(self.rest_sec)}")
             self.root.after(0, self._show_rest_window)
             while self.running.is_set() and self.state in ("resting", "paused_rest"):
                 while self.paused.is_set():
