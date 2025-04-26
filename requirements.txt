@@ -1,0 +1,4 @@
+pystray
+pillow
+plyer
+win11toast
