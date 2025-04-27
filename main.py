@@ -17,8 +17,9 @@ from tkinter import ttk
 
 import pystray
 from PIL import Image, ImageDraw, ImageTk
+
 try:
-    from plyer import notification           # 备用通知
+    from plyer import notification  # 备用通知
 except ImportError:
     notification = None
 
@@ -26,27 +27,32 @@ except ImportError:
 use_win11_toast = False
 if platform.system() == "Windows":
     try:
-        from win11toast import toast         # 仅函数形式
+        from win11toast import toast  # 仅函数形式
+
         use_win11_toast = True
     except ImportError:
         pass
 
 
 # ---------- 常量 ----------
-ICON_PATH  = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent)) / "assets" / "icon.png"    # ← 自定义图标
-if getattr(sys, 'frozen', False):            # 打包态
+ICON_PATH = (
+    Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+    / "assets"
+    / "icon.png"
+)  # ← 自定义图标
+if getattr(sys, "frozen", False):  # 打包态
     DATA_DIR = Path(sys.executable).resolve().parent
-else:                                        # 源码态
+else:  # 源码态
     DATA_DIR = Path(__file__).resolve().parent
-DATA_FILE  = DATA_DIR / "tiny_pomodoro_stats.json"   # 保存统计
+DATA_FILE = DATA_DIR / "tiny_pomodoro_stats.json"  # 保存统计
 DEF_WORK_S = 50 * 60
 DEF_REST_S = 10 * 60
 
 DARK_BG, DARK_FG = "#222831", "#eeeeee"
-ACCENT           = "#00adb5"
-MARGIN           = 32
-SHIFT_X, SHIFT_Y = 0, 60                  # 向屏幕内偏移
-AUTO_SAVE_MS     = 5 * 60 * 1000             # 5 分钟 (ms)
+ACCENT = "#00adb5"
+MARGIN = 32
+SHIFT_X, SHIFT_Y = 0, 60  # 向屏幕内偏移
+AUTO_SAVE_MS = 5 * 60 * 1000  # 5 分钟 (ms)
 
 
 # ---------- 工具 ----------
@@ -66,7 +72,7 @@ def load_stats():
             data = {}
     else:
         data = {}
-    data.setdefault("total_work", 0)          # 秒
+    data.setdefault("total_work", 0)  # 秒
     data.setdefault("total_rest", 0)
     data.setdefault("days", {})
     data.setdefault("config", {"work_sec": DEF_WORK_S, "rest_sec": DEF_REST_S})
@@ -89,7 +95,7 @@ def add_seconds(stats, key, seconds: int):
         return
     stats[key] += seconds
     today = str(date.today())
-    day   = stats["days"].setdefault(today, {"work": 0, "rest": 0})
+    day = stats["days"].setdefault(today, {"work": 0, "rest": 0})
     day[key.split("_")[1]] += seconds
     save_stats(stats)
 
@@ -98,8 +104,8 @@ def add_seconds(stats, key, seconds: int):
 def apply_dark_style(widget):
     style = ttk.Style(widget)
     style.theme_use("clam")
-    style.configure("TLabel",  background=DARK_BG, foreground=DARK_FG)
-    style.configure("TEntry",  fieldbackground="#393e46", foreground=DARK_FG)
+    style.configure("TLabel", background=DARK_BG, foreground=DARK_FG)
+    style.configure("TEntry", fieldbackground="#393e46", foreground=DARK_FG)
     style.configure("TButton", background=ACCENT, foreground=DARK_FG)
     style.map("TButton", background=[("active", "#019ca3")])
 
@@ -125,13 +131,12 @@ class StartWindow(tk.Toplevel):
         self.title("")
         self.configure(bg=DARK_BG)
         self.resizable(False, False)
-        self.attributes("-topmost", True)      # 置顶
+        self.attributes("-topmost", True)  # 置顶
         apply_dark_style(self)
 
-        ttk.Button(self,
-                   text="开始工作",
-                   width=18,
-                   command=self._begin).grid(row=0, column=0, padx=25, pady=25)
+        ttk.Button(self, text="开始工作", width=18, command=self._begin).grid(
+            row=0, column=0, padx=25, pady=25
+        )
 
         self.after(10, self._place_pos)
         self.protocol("WM_DELETE_WINDOW", self.withdraw)
@@ -139,7 +144,7 @@ class StartWindow(tk.Toplevel):
     def _place_pos(self):
         self.update_idletasks()
         sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
-        w, h   = self.winfo_width(), self.winfo_height()
+        w, h = self.winfo_width(), self.winfo_height()
         x = sw - w - (MARGIN + SHIFT_X)
         y = sh - h - (MARGIN + SHIFT_Y)
         self.geometry(f"{w}x{h}+{x}+{y}")
@@ -169,14 +174,16 @@ class RestWindow(tk.Toplevel):
         self.title("")
         self.configure(bg=DARK_BG)
         self.resizable(False, False)
-        self.attributes("-topmost", True)      # 置顶
+        self.attributes("-topmost", True)  # 置顶
         apply_dark_style(self)
 
         self.var_info = tk.StringVar()
-        ttk.Label(self, textvariable=self.var_info)\
-            .grid(row=0, column=0, padx=20, pady=(20, 10))
-        ttk.Button(self, text="结束休息", command=self._end_rest, width=14)\
-            .grid(row=1, column=0, pady=(0, 20))
+        ttk.Label(self, textvariable=self.var_info).grid(
+            row=0, column=0, padx=20, pady=(20, 10)
+        )
+        ttk.Button(self, text="结束休息", command=self._end_rest, width=14).grid(
+            row=1, column=0, pady=(0, 20)
+        )
 
         self.after(10, self._place_pos)
         self._tick()
@@ -185,14 +192,14 @@ class RestWindow(tk.Toplevel):
     def _place_pos(self):
         self.update_idletasks()
         sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
-        w, h   = self.winfo_width(), self.winfo_height()
+        w, h = self.winfo_width(), self.winfo_height()
         x = sw - w - (MARGIN + SHIFT_X)
         y = sh - h - (MARGIN + SHIFT_Y)
         self.geometry(f"{w}x{h}+{x}+{y}")
 
     def _tick(self):
         elapsed = int(self.app.elapsed_seconds)
-        target  = self.app.rest_sec
+        target = self.app.rest_sec
         self.var_info.set(f"休息 {fmt_sec(elapsed)} / {fmt_sec(target)}")
         if self.app.state in ("resting", "paused_rest"):
             self.after(1000, self._tick)
@@ -204,7 +211,7 @@ class RestWindow(tk.Toplevel):
     def refresh_info(self):
         """立刻把标签更新为最新休息上限"""
         elapsed = int(self.app.elapsed_seconds)
-        target  = self.app.rest_sec
+        target = self.app.rest_sec
         self.var_info.set(f"休息 {fmt_sec(elapsed)} / {fmt_sec(target)}")
 
 
@@ -228,16 +235,16 @@ class WorkRestApp:
 
         self.state = "idle"
         self.elapsed_seconds = 0
-        self.session_flushed = 0      # 本轮已写入 stats 的秒数
+        self.session_flushed = 0  # 本轮已写入 stats 的秒数
 
         self.running = threading.Event()
-        self.paused  = threading.Event()
+        self.paused = threading.Event()
 
-        self.icon         = None
-        self.tray_thread  = None
+        self.icon = None
+        self.tray_thread = None
         self.timer_thread = None
         self.settings_win = None
-        self.rest_win     = None
+        self.rest_win = None
 
         # 启动自动保存循环
         self._auto_save()
@@ -251,8 +258,8 @@ class WorkRestApp:
             return tk.PhotoImage(file=str(ICON_PATH))
         except Exception:
             # 如果文件缺失或损坏，则用备用托盘图生成
-            pil_img = self._create_icon()                  # PIL.Image
-            return ImageTk.PhotoImage(pil_img)             # 转成 PhotoImage
+            pil_img = self._create_icon()  # PIL.Image
+            return ImageTk.PhotoImage(pil_img)  # 转成 PhotoImage
 
     # === 自动保存 ===
     def _auto_save(self):
@@ -302,17 +309,22 @@ class WorkRestApp:
             self.elapsed_seconds = 0
             self._notify("开始工作", f"专注 {fmt_sec(self.work_sec)}")
 
-            # ✨ 用 while 替换 for，随时感知 work_sec 的变化
+            # 修改：支持 paused_work 状态，暂停时 stay in work loop
             while (
                 self.running.is_set()
-                and self.state == "working"         # 处理中或被继续
+                and self.state in ("working", "paused_work")
                 and self.elapsed_seconds < self.work_sec
             ):
-                while self.paused.is_set():         # 暂停
+                if self.paused.is_set():
                     time.sleep(0.5)
+                    continue
                 time.sleep(1)
                 self.elapsed_seconds += 1
-            self._flush_elapsed()                   # 段尾冲账
+            self._flush_elapsed()
+
+            # 退出后不再启动休息段
+            if not self.running.is_set():
+                break
 
             # ------ 休息 ------
             self.session_flushed = 0
@@ -338,7 +350,7 @@ class WorkRestApp:
         """优先使用 asset/icon.png；若失败则绘制备用图标"""
         try:
             img = Image.open(ICON_PATH).convert("RGBA")
-            if img.size != (64, 64):        # pystray 建议 64×64
+            if img.size != (64, 64):  # pystray 建议 64×64
                 img = img.resize((64, 64), Image.LANCZOS)
             return img
         except Exception as e:
@@ -346,25 +358,24 @@ class WorkRestApp:
 
         # --- 备用：用 Pillow 绘制 ---
         size = 64
-        img  = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
         draw.ellipse((8, 8, 56, 56), fill=(0, 173, 181))
-        draw.polygon([(32, 16), (48, 32), (32, 48), (16, 32)],
-                     fill=(34, 40, 49))
+        draw.polygon([(32, 16), (48, 32), (32, 48), (16, 32)], fill=(34, 40, 49))
         return img
 
     def _run_tray(self):
         pause_item = pystray.MenuItem(
             lambda _, app=self: "继续" if app.paused.is_set() else "暂停",
-            self._menu_pause
+            self._menu_pause,
         )
         menu = pystray.Menu(
             pause_item,
-            pystray.MenuItem("当前状态",  self._menu_status),
+            pystray.MenuItem("当前状态", self._menu_status),
             pystray.MenuItem("查看统计", self._menu_stats),
             pystray.MenuItem("打开设置", self._menu_settings),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("退出", self._quit)
+            pystray.MenuItem("退出", self._quit),
         )
         self.icon = pystray.Icon("WorkRest", self._create_icon(), "Tiny Pomodoro", menu)
         self.icon.run()
@@ -381,17 +392,17 @@ class WorkRestApp:
     def pause_resume(self):
         if self.state not in ("working", "resting", "paused_work", "paused_rest"):
             return
-        if self.paused.is_set():            # 继续
+        if self.paused.is_set():  # 继续
             self.paused.clear()
             self.state = "working" if self.state == "paused_work" else "resting"
             self._notify("继续", "计时器已继续")
-        else:                               # 暂停
+        else:  # 暂停
             self.paused.set()
             self.state = "paused_work" if self.state == "working" else "paused_rest"
             self._notify("已暂停", "计时器已暂停")
 
     def end_rest(self):
-        self._flush_elapsed()               # 用冲账替代整段累加
+        self._flush_elapsed()  # 用冲账替代整段累加
         self.state = "working"
 
     def stop(self):
@@ -407,25 +418,30 @@ class WorkRestApp:
 
     # === 设置窗口 ===
     def open_settings(self):
-        self._flush_elapsed()               # 确保数据显示最新
+        self._flush_elapsed()  # 确保数据显示最新
         if not self.settings_win or not self.settings_win.winfo_exists():
             self.settings_win = SettingsWindow(self)
         self.settings_win.deiconify()
         self.settings_win.lift()
 
     # === 托盘回调 ===
-    def _menu_pause(self, *_): self.pause_resume()
+    def _menu_pause(self, *_):
+        self.pause_resume()
 
     def _menu_status(self, *_):
         paused = self.paused.is_set()
         if self.state in ("working", "paused_work"):
-            self._notify("当前状态",
-                         f"已工作 {fmt_sec(self.elapsed_seconds)} / {fmt_sec(self.work_sec)}"
-                         f"（{'暂停中' if paused else '计时中'}）")
+            self._notify(
+                "当前状态",
+                f"已工作 {fmt_sec(self.elapsed_seconds)} / {fmt_sec(self.work_sec)}"
+                f"（{'暂停中' if paused else '计时中'}）",
+            )
         elif self.state in ("resting", "paused_rest"):
-            self._notify("当前状态",
-                         f"已休息 {fmt_sec(self.elapsed_seconds)} / {fmt_sec(self.rest_sec)}"
-                         f"（{'暂停中' if paused else '计时中'}）")
+            self._notify(
+                "当前状态",
+                f"已休息 {fmt_sec(self.elapsed_seconds)} / {fmt_sec(self.rest_sec)}"
+                f"（{'暂停中' if paused else '计时中'}）",
+            )
         else:
             self._notify("当前状态", "未开始计时")
 
@@ -433,12 +449,15 @@ class WorkRestApp:
         self._flush_elapsed()
         s, today = self.stats, str(date.today())
         d = s["days"].get(today, {"work": 0, "rest": 0})
-        self._notify("统计",
-                     f"今日 工作 {fmt_sec(d['work'])}  休息 {fmt_sec(d['rest'])}\n"
-                     f"总计 工作 {fmt_sec(s['total_work'])}  休息 {fmt_sec(s['total_rest'])}")
-        save_stats(self.stats)              # 已是最新
+        self._notify(
+            "统计",
+            f"今日 工作 {fmt_sec(d['work'])}  休息 {fmt_sec(d['rest'])}\n"
+            f"总计 工作 {fmt_sec(s['total_work'])}  休息 {fmt_sec(s['total_rest'])}",
+        )
+        save_stats(self.stats)  # 已是最新
 
-    def _menu_settings(self, *_): self.open_settings()
+    def _menu_settings(self, *_):
+        self.open_settings()
 
     # === 彻底退出 ===
     def _quit(self, *_):
@@ -491,14 +510,21 @@ class SettingsWindow(tk.Toplevel):
         self.work_min = tk.IntVar(value=app.work_sec // 60)
         self.rest_min = tk.IntVar(value=app.rest_sec // 60)
 
-        ttk.Label(self, text="工作时长 (分钟):").grid(row=0, column=0, pady=8, padx=8, sticky="w")
-        ttk.Entry(self, textvariable=self.work_min, width=10)\
-            .grid(row=0, column=1, pady=8, padx=8)
-        ttk.Label(self, text="休息时长 (分钟):").grid(row=1, column=0, pady=8, padx=8, sticky="w")
-        ttk.Entry(self, textvariable=self.rest_min, width=10)\
-            .grid(row=1, column=1, pady=8, padx=8)
-        ttk.Button(self, text="保存并关闭", command=self.save_close, width=18)\
-            .grid(row=2, column=0, columnspan=2, pady=12)
+        ttk.Label(self, text="工作时长 (分钟):").grid(
+            row=0, column=0, pady=8, padx=8, sticky="w"
+        )
+        ttk.Entry(self, textvariable=self.work_min, width=10).grid(
+            row=0, column=1, pady=8, padx=8
+        )
+        ttk.Label(self, text="休息时长 (分钟):").grid(
+            row=1, column=0, pady=8, padx=8, sticky="w"
+        )
+        ttk.Entry(self, textvariable=self.rest_min, width=10).grid(
+            row=1, column=1, pady=8, padx=8
+        )
+        ttk.Button(self, text="保存并关闭", command=self.save_close, width=18).grid(
+            row=2, column=0, columnspan=2, pady=12
+        )
 
         self.protocol("WM_DELETE_WINDOW", self.withdraw)
 
