@@ -12,7 +12,7 @@ Currently Windows only.
 
 ## Download
 
-[⬇️ Tiny Pomodoro](../tiny_pomodoro.exe) (double-click to run, no installation required)
+[⬇️ Tiny Pomodoro](https://github.com/xcczach/tiny-pomodoro/releases/download/v1.0.0/tiny_pomodoro.exe) (double-click to run, no installation required)
 
 ## Usage
 

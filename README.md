@@ -14,7 +14,7 @@
 
 ## 下载 Windows 可执行文件
 
-[⬇️番茄粒](./tiny_pomodoro.exe)（双击即可运行，无需安装）
+[⬇️番茄粒](https://github.com/xcczach/tiny-pomodoro/releases/download/v1.0.0/tiny_pomodoro.exe)（双击即可运行，无需安装）
 
 ## 使用说明
 
