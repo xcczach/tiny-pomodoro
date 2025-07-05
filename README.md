@@ -1,34 +1,37 @@
 <p align="right">
-  <a href="README.en.md">English</a>
+  <a href="./docs/README.en.md">English</a>
 </p>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-# Tiny Pomodoro
+# 番茄粒 Tiny Pomodoro
 
-## 一句话介绍
+ 番茄粒 Tiny Pomodoro 是一款基于系统托盘的轻量级番茄工作/休息管理工具，采用深色主题设计，支持即时统计与通知，专注于极简体验。
 
-Tiny Pomodoro 是一款基于系统托盘的轻量级番茄工作/休息管理工具，采用深色主题设计，支持即时统计与通知，专注于极简体验。
+ Tiny Pomodoro is a lightweight Pomodoro work/rest management tool based on the system tray, featuring a dark theme design, real-time statistics, and notifications, focusing on a minimalist experience.
 
-## 项目结构
+ 目前仅支持Windows
 
-<details>
-<summary>点击展开</summary>
+## 下载 Windows 可执行文件
 
-```
-Tiny Pomodoro/
-├── build.sh                # 一键打包脚本（Windows）
-├── LICENSE                 # MIT 许可证
-├── main.py                 # 程序入口
-├── requirements.txt        # 依赖列表
-├── assets/                 # 资源文件
-│   └── icon.png            # 托盘和窗口图标
-└── tiny_pomodoro_stats.json  # 运行后生成的统计数据（首次运行后创建）
-```
+[⬇️番茄粒](./tiny_pomodoro.exe)（双击即可运行，无需安装）
 
-</details>
+## 使用说明
 
-## 快速开始
+运行程序后点击“开始工作”按钮即开始计时！
+
+### 呼出菜单
+
+右键点击托盘图标即可呼出菜单。
+![托盘图标](./docs/imgs/tray_menu.png)
+
+菜单支持查看当前工作状态与统计信息，也可以打开设置调整语言、工作时长、休息时长。
+
+### 开机自启动
+
+创建快捷方式后，将其复制到 `C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup` 目录下。
+
+## 从代码构建
 
 1. 克隆仓库：
 
@@ -37,40 +40,11 @@ Tiny Pomodoro/
    cd tiny-pomodoro
    ```
 
-2. 安装依赖：
+2. 打包可执行文件（Windows）（要求Python已安装）：
 
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. 运行应用：
-
-   ```bash
-   python main.py
-   ```
-
-4. （可选）打包执行文件（Windows 下运行 Git Bash）：
-
-   ```bash
-   bash build.sh
-   ```
-
-## 命令
-
-- `python main.py`：启动 Tiny Pomodoro
-- `bash build.sh`：一键打包为独立可执行文件（Windows）
-
-## 贡献指南
-
-欢迎提交 Issue、Feature Request 或 Pull Request：
-
-1. Fork 本项目。
-2. 创建分支：`git checkout -b feature/你的功能描述`。
-3. 提交修改：`git commit -m 'Add your feature'`。
-4. 推送分支：`git push origin feature/你的功能描述`。
-5. 提交 PR，描述你的改动。
-
-请确保代码风格统一，并通过现有测试。
+   - Git Bash：`bash build.sh`
+   - PowerShell：`powershell -ExecutionPolicy Bypass -File .\build.ps1`
+   - CMD：`build.cmd`
 
 ## 许可证
 

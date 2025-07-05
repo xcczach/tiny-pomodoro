@@ -54,6 +54,91 @@ MARGIN = 32
 SHIFT_X, SHIFT_Y = 0, 60  # 向屏幕内偏移
 AUTO_SAVE_MS = 5 * 60 * 1000  # 5 分钟 (ms)
 
+# ---------- 语言/Localization ----------
+STRINGS = {
+    "zh": {
+        # generic
+        "pause": "暂停",
+        "resume": "继续",
+        "current_status": "当前状态",
+        "view_stats": "查看统计",
+        "open_settings": "打开设置",
+        "exit": "退出",
+        # windows / buttons
+        "start_work_btn": "开始工作",
+        "end_rest_btn": "结束休息",
+        "settings_title": "设置",
+        "work_min_label": "工作时长 (分钟):",
+        "rest_min_label": "休息时长 (分钟):",
+        "save_close_btn": "保存并关闭",
+        "language_label": "语言:",
+        "lang_zh": "中文",
+        "lang_en": "English",
+        # notifications
+        "notif_work_begin_title": "开始工作",
+        "notif_work_begin_msg": "专注 {duration}",
+        "notif_rest_begin_title": "开始休息",
+        "notif_rest_begin_msg": "放松 {duration}",
+        "notif_continue_title": "继续",
+        "notif_continue_msg": "计时器已继续",
+        "notif_paused_title": "已暂停",
+        "notif_paused_msg": "计时器已暂停",
+        "notif_stats_title": "统计",
+        # rest labels
+        "resting": "休息 {elapsed} / {target}",
+        "resting_overtime": "休息 {elapsed} (已超时 {overtime})",
+        "auto_start_label": "开机自启动",
+        "stats_today": "今日",
+        "stats_total": "总计",
+        "stats_work": "工作",
+        "stats_rest": "休息",
+        "status_work_progress": "已工作 {elapsed} / {target}",
+        "status_rest_progress": "已休息 {elapsed} / {target}",
+        "status_paused_label": "暂停中",
+        "status_running_label": "计时中",
+        "timer_not_started": "未开始计时",
+        # stats strings (left Chinese to avoid large refactor)
+    },
+    "en": {
+        "pause": "Pause",
+        "resume": "Resume",
+        "current_status": "Status",
+        "view_stats": "Statistics",
+        "open_settings": "Settings",
+        "exit": "Quit",
+        "start_work_btn": "Start Working",
+        "end_rest_btn": "End Rest",
+        "settings_title": "Settings",
+        "work_min_label": "Work duration (minutes):",
+        "rest_min_label": "Rest duration (minutes):",
+        "save_close_btn": "Save && Close",
+        "language_label": "Language:",
+        "lang_zh": "Chinese",
+        "lang_en": "English",
+        "notif_work_begin_title": "Work Started",
+        "notif_work_begin_msg": "Focus for {duration}",
+        "notif_rest_begin_title": "Break Started",
+        "notif_rest_begin_msg": "Relax for {duration}",
+        "notif_continue_title": "Resumed",
+        "notif_continue_msg": "Timer resumed",
+        "notif_paused_title": "Paused",
+        "notif_paused_msg": "Timer paused",
+        "notif_stats_title": "Statistics",
+        "resting": "Rest {elapsed} / {target}",
+        "resting_overtime": "Rest {elapsed} (overtime {overtime})",
+        "auto_start_label": "Launch at startup",
+        "stats_today": "Today",
+        "stats_total": "Total",
+        "stats_work": "Work",
+        "stats_rest": "Rest",
+        "status_work_progress": "Worked {elapsed} / {target}",
+        "status_rest_progress": "Rested {elapsed} / {target}",
+        "status_paused_label": "paused",
+        "status_running_label": "running",
+        "timer_not_started": "Timer not started",
+    },
+}
+
 
 # ---------- 工具 ----------
 def fmt_sec(sec: int) -> str:
@@ -75,7 +160,7 @@ def load_stats():
     data.setdefault("total_work", 0)  # 秒
     data.setdefault("total_rest", 0)
     data.setdefault("days", {})
-    data.setdefault("config", {"work_sec": DEF_WORK_S, "rest_sec": DEF_REST_S})
+    data.setdefault("config", {"work_sec": DEF_WORK_S, "rest_sec": DEF_REST_S, "lang": "zh", "auto_start": False})
     return data
 
 
@@ -100,6 +185,30 @@ def add_seconds(stats, key, seconds: int):
     save_stats(stats)
 
 
+# ---------- 开机自启动（仅 Windows 实现） ----------
+def set_auto_start(enable: bool, app_name: str = "TinyPomodoro", exe_path: str | None = None):
+    """Add or remove registry Run key for current user to launch app on Windows startup."""
+    if platform.system() != "Windows":
+        return  # 其它平台暂不实现
+
+    import winreg  # type: ignore
+
+    if exe_path is None:
+        exe_path = sys.executable if getattr(sys, "frozen", False) else str(Path(__file__).resolve())
+    key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_ALL_ACCESS) as key:
+            if enable:
+                winreg.SetValueEx(key, app_name, 0, winreg.REG_SZ, f'"{exe_path}"')
+            else:
+                try:
+                    winreg.DeleteValue(key, app_name)
+                except FileNotFoundError:
+                    pass
+    except PermissionError as e:
+        print("[auto_start] Registry write failed:", e)
+
+
 # ---------- 通用深色 ttk Style ----------
 def apply_dark_style(widget):
     style = ttk.Style(widget)
@@ -117,7 +226,7 @@ class StartWindow(tk.Toplevel):
 
         # === 去掉左上角图标 ===
         if platform.system() == "Windows":
-            # Win32 “tool window” 样式：无图标、标题栏更窄，也不会在任务栏占位
+            # Win32 "tool window" 样式：无图标、标题栏更窄，也不会在任务栏占位
             self.wm_attributes("-toolwindow", True)
             # 去掉右上角的关闭按钮
             self.overrideredirect(True)
@@ -134,7 +243,7 @@ class StartWindow(tk.Toplevel):
         self.attributes("-topmost", True)  # 置顶
         apply_dark_style(self)
 
-        ttk.Button(self, text="开始工作", width=18, command=self._begin).grid(
+        ttk.Button(self, text=self.app.t("start_work_btn"), width=18, command=self._begin).grid(
             row=0, column=0, padx=25, pady=25
         )
 
@@ -153,6 +262,13 @@ class StartWindow(tk.Toplevel):
         self.withdraw()
         self.app.start()
 
+    def update_language(self):
+        """Refresh button texts when language is switched."""
+        # Iterate over children to find the start button and update its text
+        for child in self.winfo_children():
+            if isinstance(child, ttk.Button):
+                child.config(text=self.app.t("start_work_btn"))
+
 
 # ---------- 休息弹窗 ----------
 class RestWindow(tk.Toplevel):
@@ -160,7 +276,7 @@ class RestWindow(tk.Toplevel):
         super().__init__(app.root)
         # === 去掉左上角图标 ===
         if platform.system() == "Windows":
-            # Win32 “tool window” 样式：无图标、标题栏更窄，也不会在任务栏占位
+            # Win32 "tool window" 样式：无图标、标题栏更窄，也不会在任务栏占位
             self.wm_attributes("-toolwindow", True)
             # 去掉右上角的关闭按钮
             self.overrideredirect(True)
@@ -181,7 +297,7 @@ class RestWindow(tk.Toplevel):
         ttk.Label(self, textvariable=self.var_info).grid(
             row=0, column=0, padx=20, pady=(20, 10)
         )
-        ttk.Button(self, text="结束休息", command=self._end_rest, width=14).grid(
+        ttk.Button(self, text=self.app.t("end_rest_btn"), command=self._end_rest, width=14).grid(
             row=1, column=0, pady=(0, 20)
         )
 
@@ -200,7 +316,12 @@ class RestWindow(tk.Toplevel):
     def _tick(self):
         elapsed = int(self.app.elapsed_seconds)
         target = self.app.rest_sec
-        self.var_info.set(f"休息 {fmt_sec(elapsed)} / {fmt_sec(target)}")
+        if elapsed >= target:
+            self.var_info.set(self.app.t("resting_overtime", elapsed=fmt_sec(elapsed), overtime=fmt_sec(elapsed - target)))
+        else:
+            self.var_info.set(self.app.t("resting", elapsed=fmt_sec(elapsed), target=fmt_sec(target)))
+        # Recalculate size in case text length (especially in English) changes
+        self._place_pos()
         if self.app.state in ("resting", "paused_rest"):
             self.after(1000, self._tick)
 
@@ -209,14 +330,36 @@ class RestWindow(tk.Toplevel):
         self.app.end_rest()
 
     def refresh_info(self):
-        """立刻把标签更新为最新休息上限"""
+        """立刻把标签更新为最新休息上限，并调整窗口大小"""
         elapsed = int(self.app.elapsed_seconds)
         target = self.app.rest_sec
-        self.var_info.set(f"休息 {fmt_sec(elapsed)} / {fmt_sec(target)}")
+        if elapsed >= target:
+            self.var_info.set(self.app.t("resting_overtime", elapsed=fmt_sec(elapsed), overtime=fmt_sec(elapsed - target)))
+        else:
+            self.var_info.set(self.app.t("resting", elapsed=fmt_sec(elapsed), target=fmt_sec(target)))
+        # Update geometry to fit new text (important when switching languages)
+        self._place_pos()
+
+    def update_language(self):
+        """Refresh button and label texts based on new language."""
+        self.title("")  # title is empty currently
+        # update button text
+        for child in self.winfo_children():
+            if isinstance(child, ttk.Button):
+                child.config(text=self.app.t("end_rest_btn"))
+        self.refresh_info()
 
 
 # ---------- 主应用 ----------
 class WorkRestApp:
+    # Translation helper will be instantiated later
+    def t(self, key: str, **kwargs):
+        """Return localized text by key, formatted with kwargs."""
+        txt = STRINGS.get(self.lang, STRINGS["zh"]).get(key, key)
+        if kwargs:
+            return txt.format(**kwargs)
+        return txt
+
     def __init__(self):
         self.root = tk.Tk()
         self.root.withdraw()
@@ -230,6 +373,14 @@ class WorkRestApp:
         # -------------------------------------------
 
         self.stats = load_stats()
+        # --- Language setting ---
+        self.lang = self.stats["config"].get("lang", "zh")
+        self.stats["config"].setdefault("lang", self.lang)
+
+        self.auto_start = self.stats["config"].get("auto_start", False)
+        # Ensure registry matches preference
+        set_auto_start(self.auto_start)
+
         self.work_sec = self.stats["config"]["work_sec"]
         self.rest_sec = self.stats["config"]["rest_sec"]
 
@@ -249,7 +400,8 @@ class WorkRestApp:
         # 启动自动保存循环
         self._auto_save()
 
-        StartWindow(self)
+        # Keep reference so we can refresh its texts when language changes
+        self.start_win = StartWindow(self)
 
     def _load_tk_icon(self):
         """返回 tk.PhotoImage，用于窗口左上角和任务栏"""
@@ -307,7 +459,7 @@ class WorkRestApp:
             self.session_flushed = 0
             self.state = "working"
             self.elapsed_seconds = 0
-            self._notify("开始工作", f"专注 {fmt_sec(self.work_sec)}")
+            self._notify(self.t("notif_work_begin_title"), self.t("notif_work_begin_msg", duration=fmt_sec(self.work_sec)))
 
             # 修改：支持 paused_work 状态，暂停时 stay in work loop
             while (
@@ -330,13 +482,12 @@ class WorkRestApp:
             self.session_flushed = 0
             self.state = "resting"
             self.elapsed_seconds = 0
-            self._notify("开始休息", f"放松 {fmt_sec(self.rest_sec)}")
+            self._notify(self.t("notif_rest_begin_title"), self.t("notif_rest_begin_msg", duration=fmt_sec(self.rest_sec)))
             self.root.after(0, self._show_rest_window)
 
             while (
                 self.running.is_set()
                 and self.state in ("resting", "paused_rest")
-                and self.elapsed_seconds < self.rest_sec
             ):
                 while self.paused.is_set():
                     time.sleep(0.5)
@@ -364,19 +515,22 @@ class WorkRestApp:
         draw.polygon([(32, 16), (48, 32), (32, 48), (16, 32)], fill=(34, 40, 49))
         return img
 
-    def _run_tray(self):
+    def _build_tray_menu(self):
         pause_item = pystray.MenuItem(
-            lambda _, app=self: "继续" if app.paused.is_set() else "暂停",
+            lambda _, app=self: app.t("resume") if app.paused.is_set() else app.t("pause"),
             self._menu_pause,
         )
-        menu = pystray.Menu(
+        return pystray.Menu(
             pause_item,
-            pystray.MenuItem("当前状态", self._menu_status),
-            pystray.MenuItem("查看统计", self._menu_stats),
-            pystray.MenuItem("打开设置", self._menu_settings),
+            pystray.MenuItem(self.t("current_status"), self._menu_status),
+            pystray.MenuItem(self.t("view_stats"), self._menu_stats),
+            pystray.MenuItem(self.t("open_settings"), self._menu_settings),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("退出", self._quit),
+            pystray.MenuItem(self.t("exit"), self._quit),
         )
+
+    def _run_tray(self):
+        menu = self._build_tray_menu()
         self.icon = pystray.Icon("WorkRest", self._create_icon(), "Tiny Pomodoro", menu)
         self.icon.run()
 
@@ -395,11 +549,11 @@ class WorkRestApp:
         if self.paused.is_set():  # 继续
             self.paused.clear()
             self.state = "working" if self.state == "paused_work" else "resting"
-            self._notify("继续", "计时器已继续")
+            self._notify(self.t("notif_continue_title"), self.t("notif_continue_msg"))
         else:  # 暂停
             self.paused.set()
             self.state = "paused_work" if self.state == "working" else "paused_rest"
-            self._notify("已暂停", "计时器已暂停")
+            self._notify(self.t("notif_paused_title"), self.t("notif_paused_msg"))
 
     def end_rest(self):
         self._flush_elapsed()  # 用冲账替代整段累加
@@ -431,28 +585,37 @@ class WorkRestApp:
     def _menu_status(self, *_):
         paused = self.paused.is_set()
         if self.state in ("working", "paused_work"):
-            self._notify(
-                "当前状态",
-                f"已工作 {fmt_sec(self.elapsed_seconds)} / {fmt_sec(self.work_sec)}"
-                f"（{'暂停中' if paused else '计时中'}）",
+            progress = self.t(
+                "status_work_progress",
+                elapsed=fmt_sec(self.elapsed_seconds),
+                target=fmt_sec(self.work_sec),
             )
+            state_label = self.t("status_paused_label") if paused else self.t("status_running_label")
+            self._notify(self.t("current_status"), f"{progress} ({state_label})")
         elif self.state in ("resting", "paused_rest"):
-            self._notify(
-                "当前状态",
-                f"已休息 {fmt_sec(self.elapsed_seconds)} / {fmt_sec(self.rest_sec)}"
-                f"（{'暂停中' if paused else '计时中'}）",
+            progress = self.t(
+                "status_rest_progress",
+                elapsed=fmt_sec(self.elapsed_seconds),
+                target=fmt_sec(self.rest_sec),
             )
+            state_label = self.t("status_paused_label") if paused else self.t("status_running_label")
+            self._notify(self.t("current_status"), f"{progress} ({state_label})")
         else:
-            self._notify("当前状态", "未开始计时")
+            self._notify(self.t("current_status"), self.t("timer_not_started"))
 
     def _menu_stats(self, *_):
         self._flush_elapsed()
         s, today = self.stats, str(date.today())
         d = s["days"].get(today, {"work": 0, "rest": 0})
+        # 使用多语言字符串构建统计信息
+        today_label = self.t("stats_today")
+        total_label = self.t("stats_total")
+        work_label = self.t("stats_work")
+        rest_label = self.t("stats_rest")
         self._notify(
-            "统计",
-            f"今日 工作 {fmt_sec(d['work'])}  休息 {fmt_sec(d['rest'])}\n"
-            f"总计 工作 {fmt_sec(s['total_work'])}  休息 {fmt_sec(s['total_rest'])}",
+            self.t("notif_stats_title"),
+            f"{today_label} {work_label} {fmt_sec(d['work'])}  {rest_label} {fmt_sec(d['rest'])}\n"
+            f"{total_label} {work_label} {fmt_sec(s['total_work'])}  {rest_label} {fmt_sec(s['total_rest'])}",
         )
         save_stats(self.stats)  # 已是最新
 
@@ -489,6 +652,24 @@ class WorkRestApp:
         self.tray_thread.start()
         self.root.mainloop()
 
+    def _rebuild_tray_menu(self):
+        """Recreate tray menu to reflect current language."""
+        if not self.icon:
+            return
+        self.icon.menu = self._build_tray_menu()
+
+    def apply_language_change(self):
+        """Called after self.lang is modified to refresh UI labels."""
+        # Rebuild tray menu if icon exists
+        if self.icon:
+            self._rebuild_tray_menu()
+        # Update rest window
+        if self.rest_win and self.rest_win.winfo_exists():
+            self.rest_win.update_language()
+        # Update start window
+        if getattr(self, "start_win", None) and self.start_win.winfo_exists():
+            self.start_win.update_language()
+
 
 # ---------- 设置窗口 ----------
 class SettingsWindow(tk.Toplevel):
@@ -497,11 +678,11 @@ class SettingsWindow(tk.Toplevel):
         self.transient(app.root)
 
         if platform.system() == "Windows":
-            # “tool window” 样式：更窄的标题栏，也避免任务栏占位
+            # "tool window" 样式：更窄的标题栏，也避免任务栏占位
             self.wm_attributes("-toolwindow", True)
         self.iconphoto(True, app.tk_icon)
         self.app = app
-        self.title("设置")
+        self.title(app.t("settings_title"))
         self.configure(bg=DARK_BG)
         self.resizable(False, False)
         self.attributes("-topmost", True)  # 置顶
@@ -510,21 +691,37 @@ class SettingsWindow(tk.Toplevel):
         self.work_min = tk.IntVar(value=app.work_sec // 60)
         self.rest_min = tk.IntVar(value=app.rest_sec // 60)
 
-        ttk.Label(self, text="工作时长 (分钟):").grid(
+        # --- validation function for positive integers ---
+        vcmd = (self.register(self._validate_positive_int), "%P")
+
+        self.lbl_work = ttk.Label(self, text=app.t("work_min_label"))
+        self.lbl_work.grid(
             row=0, column=0, pady=8, padx=8, sticky="w"
         )
-        ttk.Entry(self, textvariable=self.work_min, width=10).grid(
+        ttk.Entry(self, textvariable=self.work_min, width=10, validate="key", validatecommand=vcmd).grid(
             row=0, column=1, pady=8, padx=8
         )
-        ttk.Label(self, text="休息时长 (分钟):").grid(
+        self.lbl_rest = ttk.Label(self, text=app.t("rest_min_label"))
+        self.lbl_rest.grid(
             row=1, column=0, pady=8, padx=8, sticky="w"
         )
-        ttk.Entry(self, textvariable=self.rest_min, width=10).grid(
+        ttk.Entry(self, textvariable=self.rest_min, width=10, validate="key", validatecommand=vcmd).grid(
             row=1, column=1, pady=8, padx=8
         )
-        ttk.Button(self, text="保存并关闭", command=self.save_close, width=18).grid(
-            row=2, column=0, columnspan=2, pady=12
-        )
+
+        # --- Language selection ---
+        self.lbl_lang = ttk.Label(self, text=app.t("language_label"))
+        self.lbl_lang.grid(row=3, column=0, pady=8, padx=8, sticky="w")
+        self.lang_var = tk.StringVar(value="中文" if app.lang == "zh" else "English")
+        self.cmb_lang = ttk.Combobox(self, textvariable=self.lang_var, values=[app.t("lang_zh"), app.t("lang_en")], state="readonly", width=12)
+        self.cmb_lang.grid(row=3, column=1, pady=8, padx=8)
+
+        # Save button
+        self.save_btn = ttk.Button(self, text=app.t("save_close_btn"), command=self.save_close, width=18)
+        self.save_btn.grid(row=4, column=0, columnspan=2, pady=12)
+
+        # Bind language change event for realtime update
+        self.lang_var.trace_add("write", self._on_lang_change)
 
         self.protocol("WM_DELETE_WINDOW", self.withdraw)
 
@@ -544,6 +741,56 @@ class SettingsWindow(tk.Toplevel):
             # 让工作段立即结束
             self.app.paused.clear()
         self.withdraw()
+
+        # --- language ---
+        sel = self.lang_var.get()
+        new_lang = "en" if sel.lower().startswith("e") else "zh"
+        if new_lang == self.app.lang:
+            return
+        self.app.lang = new_lang
+        self.app.stats["config"]["lang"] = new_lang
+        save_stats(self.app.stats)
+
+        # Update texts of widgets in this window
+        self.title(self.app.t("settings_title"))
+        self.lbl_work.config(text=self.app.t("work_min_label"))
+        self.lbl_rest.config(text=self.app.t("rest_min_label"))
+        self.lbl_lang.config(text=self.app.t("language_label"))
+        self.save_btn.config(text=self.app.t("save_close_btn"))
+        # Update combobox values labels
+        self.cmb_lang.config(values=[self.app.t("lang_zh"), self.app.t("lang_en")])
+
+        # Notify app to rebuild other UI parts
+        self.app.apply_language_change()
+
+    def _on_lang_change(self, *_):
+        sel = self.lang_var.get()
+        new_lang = "en" if sel.lower().startswith("e") else "zh"
+        if new_lang == self.app.lang:
+            return
+        self.app.lang = new_lang
+        self.app.stats["config"]["lang"] = new_lang
+        save_stats(self.app.stats)
+
+        # Update texts of widgets in this window
+        self.title(self.app.t("settings_title"))
+        self.lbl_work.config(text=self.app.t("work_min_label"))
+        self.lbl_rest.config(text=self.app.t("rest_min_label"))
+        self.lbl_lang.config(text=self.app.t("language_label"))
+        self.save_btn.config(text=self.app.t("save_close_btn"))
+        # Update combobox values labels
+        self.cmb_lang.config(values=[self.app.t("lang_zh"), self.app.t("lang_en")])
+
+        # Notify app to rebuild other UI parts
+        self.app.apply_language_change()
+
+    # --- validation helper ---
+    @staticmethod
+    def _validate_positive_int(p: str) -> bool:
+        """Return True if p is empty (in-progress edit) or represents a positive integer."""
+        if p == "":
+            return True
+        return p.isdigit() and int(p) > 0
 
 
 # -------- main --------

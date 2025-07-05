@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# 确保 UTF-8 语言环境，避免中文乱码
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
+
 # build.sh —— Windows 平台（Git Bash）一键打包 Tiny Pompdoro
 set -euo pipefail                  # 出错即停 & 抓未定义变量
 
@@ -8,7 +12,7 @@ VENV_DIR="tiny-pomodoro"
 APP_NAME="Tiny Pomodoro"
 ENTRY="main.py"
 ICON="assets/icon.png"
-ASSETS="assets/*;assets"           # ← Windows 下分隔符必须是分号“;”
+ASSETS="assets/*;assets"           # ← Windows 下分隔符必须是分号";"
 
 # 1. 创建 / 激活虚拟环境（如果不存在）
 if [[ ! -d "$VENV_DIR" ]]; then
@@ -38,3 +42,4 @@ pyinstaller "${opts[@]}"
 rm -rf "build" "${VENV_DIR}" "${APP_NAME}.spec"
 
 echo -e "\n✅ 完成！可执行文件位于 dist/${APP_NAME}.exe"
+echo -e "Done! Executable located at dist/${APP_NAME}.exe"
