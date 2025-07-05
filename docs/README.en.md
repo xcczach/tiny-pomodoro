@@ -21,6 +21,7 @@ After launching the program click the "Start Work" button to begin timing!
 ### Tray menu
 
 Right-click the tray icon to open the menu.  
+
 ![Tray Menu](./imgs/tray_menu.png)
 
 The menu shows your current status and statistics, and also lets you open the settings window to change language, work duration and break duration.
